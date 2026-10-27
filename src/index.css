@@ -1,0 +1,128 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-main: #f4f0ea;
+    --ink: #000000;
+    --card-white: #ffffff;
+    
+    /* Kristina Neo-Brutalist Saturated Palette */
+    --neo-lime: #cbf34a;       /* Signature electric lime/yellow */
+    --neo-cyan: #3fe0ff;       /* Crisp turquoise/cyan */
+    --neo-pink: #ff68b5;       /* Vibrant bubblegum/hot pink */
+    --neo-orange: #ff6b35;     /* Punchy safety orange */
+    --neo-purple: #9b51e0;     /* Electric purple */
+    --neo-blue: #2f80ed;       /* Royal cobalt */
+
+    --font-heading: "Archivo", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-mono: "JetBrains Mono", Menlo, ui-monospace, monospace;
+    --font-body: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  body {
+    background-color: var(--bg-main);
+    color: var(--ink);
+    font-family: var(--font-body);
+    line-height: 1.5;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: var(--neo-lime);
+    color: #000000;
+  }
+}
+
+/* Master Neo-Brutalist Hard Drop Shadows (Tactile 3D pop, zero blur) */
+.shadow-brutal-sm {
+  box-shadow: 3px 3px 0px #000000;
+}
+
+.shadow-brutal {
+  box-shadow: 5px 5px 0px #000000;
+}
+
+.shadow-brutal-lg {
+  box-shadow: 8px 8px 0px #000000;
+}
+
+.shadow-brutal-xl {
+  box-shadow: 12px 12px 0px #000000;
+}
+
+/* Interactive Button Hover Physics */
+.btn-brutal-hover {
+  transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-brutal-hover:hover {
+  transform: translate(-3px, -3px);
+  box-shadow: 8px 8px 0px #000000;
+}
+
+.btn-brutal-hover:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0px #000000;
+}
+
+/* Card hover animation */
+.card-brutal-hover {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.card-brutal-hover:hover {
+  transform: translate(-3px, -3px);
+  box-shadow: 8px 8px 0px #000000;
+}
+
+/* Architectural Grid & Dot Backgrounds */
+.bg-grid-neo {
+  background-image: 
+    linear-gradient(to right, rgba(0, 0, 0, 0.08) 1.5px, transparent 1.5px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.08) 1.5px, transparent 1.5px);
+  background-size: 32px 32px;
+}
+
+.bg-dots-neo {
+  background-image: radial-gradient(rgba(0, 0, 0, 0.16) 1.5px, transparent 1.5px);
+  background-size: 20px 20px;
+}
+
+/* Diagonal Hazard Tape Stripe */
+.bg-hazard-tape {
+  background: repeating-linear-gradient(
+    -45deg,
+    #cbf34a,
+    #cbf34a 14px,
+    #000000 14px,
+    #000000 28px
+  );
+}
+
+/* Marquee infinite scroll */
+@keyframes marquee-scroll {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee-scroll {
+  display: flex;
+  width: max-content;
+  animation: marquee-scroll 20s linear infinite;
+}
+
+/* Tactile pill badge */
+.badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  border: 2px solid #000000;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  box-shadow: 2px 2px 0px #000000;
+}
