@@ -4,11 +4,12 @@ import { GLITCH_EXPRESSIONS, HARDWARE_HOTSPOTS } from '../data/glitchData';
 import { sound } from '../utils/sound';
 
 export default function Glitch3DViewer({
-  currentExpressionId,
+  currentExpressionId = 'sparkle',
   onExpressionChange,
-  activeHotspotId,
+  activeHotspotId = 'oled',
   onHotspotSelect,
   forcedAngle = null,
+  shellVariant = 'clear', // 'clear', 'smoke', 'cyber'
   reducedMotion = false,
   className = ''
 }) {
@@ -23,6 +24,7 @@ export default function Glitch3DViewer({
     renderer: null,
     glitchGroup: null,
     caseMesh: null,
+    caseMaterial: null,
     oledMesh: null,
     animationFrameId: null,
     targetRotation: { x: 0.08, y: 0.15 },
@@ -36,6 +38,7 @@ export default function Glitch3DViewer({
   const [fallbackMode, setFallbackMode] = useState(false);
   const [currentView, setCurrentView] = useState('front');
 
+  // Draw current expression onto internal 2D canvas texture
   const updateOledTexture = (exprId) => {
     const oledCanvas = oledCanvasRef.current;
     if (!oledCanvas) return;
@@ -57,6 +60,31 @@ export default function Glitch3DViewer({
     updateOledTexture(currentExpressionId);
   }, [currentExpressionId]);
 
+  // Update shell resin material when variant changes
+  useEffect(() => {
+    const mat = threeRefs.current.caseMaterial;
+    if (!mat) return;
+
+    if (shellVariant === 'smoke') {
+      mat.color.set(0x22262b);
+      mat.transmission = 0.85;
+      mat.roughness = 0.12;
+      mat.opacity = 0.92;
+    } else if (shellVariant === 'cyber') {
+      mat.color.set(0xddaa44);
+      mat.transmission = 0.88;
+      mat.roughness = 0.08;
+      mat.opacity = 0.90;
+    } else {
+      // Clear optical resin (production target)
+      mat.color.set(0xffffff);
+      mat.transmission = 0.96;
+      mat.roughness = 0.04;
+      mat.opacity = 0.95;
+    }
+    mat.needsUpdate = true;
+  }, [shellVariant]);
+
   useEffect(() => {
     const container = containerRef.current;
     const canvas = canvasRef.current;
@@ -65,10 +93,10 @@ export default function Glitch3DViewer({
     try {
       const scene = new THREE.Scene();
       const width = container.clientWidth || 400;
-      const height = container.clientHeight || 480;
+      const height = container.clientHeight || 460;
 
-      const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
-      camera.position.set(0, 0, 4.8);
+      const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 100);
+      camera.position.set(0, 0, 4.9);
 
       const renderer = new THREE.WebGLRenderer({
         canvas,
@@ -79,25 +107,28 @@ export default function Glitch3DViewer({
       renderer.setSize(width, height);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.35;
+      renderer.toneMappingExposure = 1.25;
 
       threeRefs.current.scene = scene;
       threeRefs.current.camera = camera;
       threeRefs.current.renderer = renderer;
 
-      // Studio Lighting
-      const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+      // Studio Lighting for High-End Editorial Product Shoot
+      const ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
       scene.add(ambientLight);
 
-      const keyLight = new THREE.DirectionalLight(0xffffff, 2.4);
+      // Key light (soft warm white from top-right)
+      const keyLight = new THREE.DirectionalLight(0xfffdfa, 2.2);
       keyLight.position.set(4, 5, 5);
       scene.add(keyLight);
 
-      const cyanGlow = new THREE.PointLight(0x00f5ff, 3.5, 4.5);
-      cyanGlow.position.set(0, 0.3, 0.9);
-      scene.add(cyanGlow);
+      // Cyan fill light mimicking OLED emission
+      const oledGlow = new THREE.PointLight(0x00f5ff, 3.2, 4.0);
+      oledGlow.position.set(0, 0.35, 0.8);
+      scene.add(oledGlow);
 
-      const rimLight = new THREE.DirectionalLight(0xffffff, 1.8);
+      // Cool rim light for silhouette edge highlights
+      const rimLight = new THREE.DirectionalLight(0xdde8f8, 1.6);
       rimLight.position.set(-4, -2, -3);
       scene.add(rimLight);
 
@@ -105,76 +136,79 @@ export default function Glitch3DViewer({
       scene.add(glitchGroup);
       threeRefs.current.glitchGroup = glitchGroup;
 
-      // 1. Crystal Optical Clear Resin Case
-      const caseGeo = createRoundedBoxGeometry(2.0, 2.5, 1.05, 0.25, 12);
+      // 1. Crystal Optical Clear Resin Shell (50 × 40 × 20 mm scale)
+      const caseGeo = createRoundedBoxGeometry(2.0, 2.5, 1.0, 0.22, 12);
       const caseMat = new THREE.MeshPhysicalMaterial({
         color: 0xffffff,
-        metalness: 0.04,
-        roughness: 0.05,
+        metalness: 0.02,
+        roughness: 0.04,
         transmission: 0.96,
-        thickness: 1.3,
-        ior: 1.54,
-        specularIntensity: 1.3,
+        thickness: 1.2,
+        ior: 1.52,
+        specularIntensity: 1.2,
         specularColor: 0xffffff,
         transparent: true,
-        opacity: 0.94,
+        opacity: 0.95,
         clearcoat: 1.0,
-        clearcoatRoughness: 0.03
+        clearcoatRoughness: 0.02
       });
+      threeRefs.current.caseMaterial = caseMat;
       const caseMesh = new THREE.Mesh(caseGeo, caseMat);
       glitchGroup.add(caseMesh);
       threeRefs.current.caseMesh = caseMesh;
 
-      // 2. Hardware PCB Substrate
-      const pcbGeo = new THREE.BoxGeometry(1.58, 2.0, 0.08);
+      // 2. Main Blue Carrier Perfboard (matching prototype photo blue soldermask)
+      const pcbGeo = new THREE.BoxGeometry(1.6, 2.05, 0.08);
       const pcbMat = new THREE.MeshStandardMaterial({
-        color: 0x154586, // Rekko deep royal blue PCB
-        metalness: 0.3,
-        roughness: 0.4
+        color: 0x15427d, // Prototype royal blue perfboard
+        metalness: 0.25,
+        roughness: 0.45
       });
       const pcbMesh = new THREE.Mesh(pcbGeo, pcbMat);
       pcbMesh.position.set(0, -0.05, 0.08);
       glitchGroup.add(pcbMesh);
 
-      // Gold Traces
-      const tracesGeo = new THREE.PlaneGeometry(1.45, 1.85);
+      // Solder Eyelets & Wiring Traces Texture
+      const tracesGeo = new THREE.PlaneGeometry(1.48, 1.9);
       const tracesCanvas = document.createElement('canvas');
       tracesCanvas.width = 256;
       tracesCanvas.height = 256;
       const tctx = tracesCanvas.getContext('2d');
-      tctx.fillStyle = '#0f3261';
+      tctx.fillStyle = '#103565';
       tctx.fillRect(0, 0, 256, 256);
-      tctx.strokeStyle = '#e2a843';
-      tctx.lineWidth = 3;
-      for (let i = 16; i < 240; i += 16) {
-        tctx.beginPath();
-        tctx.moveTo(20, i);
-        tctx.lineTo(236, i);
-        tctx.stroke();
+      // Gold and silver eyelet dots
+      tctx.fillStyle = '#d4af37';
+      for (let y = 14; y < 245; y += 18) {
+        for (let x = 14; x < 245; x += 18) {
+          tctx.beginPath();
+          tctx.arc(x, y, 2.2, 0, Math.PI * 2);
+          tctx.fill();
+        }
       }
       const tracesTexture = new THREE.CanvasTexture(tracesCanvas);
       const tracesMat = new THREE.MeshBasicMaterial({
         map: tracesTexture,
         transparent: true,
-        opacity: 0.75
+        opacity: 0.8
       });
       const tracesMesh = new THREE.Mesh(tracesGeo, tracesMat);
       tracesMesh.position.set(0, -0.05, 0.13);
       glitchGroup.add(tracesMesh);
 
-      // OLED Bezel & Screen
+      // 3. 1.3-inch Blue Monochrome OLED Display Module
       const oledWidth = 1.35;
-      const oledHeight = 0.85;
-      const oledFrameGeo = new THREE.BoxGeometry(oledWidth + 0.12, oledHeight + 0.12, 0.06);
+      const oledHeight = 0.82;
+      const oledFrameGeo = new THREE.BoxGeometry(oledWidth + 0.1, oledHeight + 0.1, 0.05);
       const oledFrameMat = new THREE.MeshStandardMaterial({
-        color: 0x05080c,
-        roughness: 0.2,
+        color: 0x070a0f,
+        roughness: 0.15,
         metalness: 0.85
       });
       const oledFrameMesh = new THREE.Mesh(oledFrameGeo, oledFrameMat);
-      oledFrameMesh.position.set(0, 0.35, 0.2);
+      oledFrameMesh.position.set(0, 0.38, 0.2);
       glitchGroup.add(oledFrameMesh);
 
+      // Emissive OLED Pixel Screen
       const oledTexture = new THREE.CanvasTexture(oledCanvasRef.current);
       oledTexture.minFilter = THREE.LinearFilter;
       oledTextureRef.current = oledTexture;
@@ -186,36 +220,54 @@ export default function Glitch3DViewer({
         color: 0xffffff
       });
       const oledMesh = new THREE.Mesh(oledScreenGeo, oledScreenMat);
-      oledMesh.position.set(0, 0.35, 0.24);
+      oledMesh.position.set(0, 0.38, 0.23);
       glitchGroup.add(oledMesh);
       threeRefs.current.oledMesh = oledMesh;
 
-      // Microcontroller Chip
-      const mcuGeo = new THREE.BoxGeometry(0.52, 0.52, 0.09);
-      const mcuMat = new THREE.MeshStandardMaterial({
-        color: 0x181a1c,
-        roughness: 0.25,
+      // 4-Pin OLED Header at top of screen (GND, VDD, SCK, SDA)
+      const headerGeo = new THREE.BoxGeometry(0.5, 0.08, 0.06);
+      const headerMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.8 });
+      const headerMesh = new THREE.Mesh(headerGeo, headerMat);
+      headerMesh.position.set(0, 0.85, 0.2);
+      glitchGroup.add(headerMesh);
+
+      // 4. Seeed Studio XIAO ESP32-C3 Board (Lower section)
+      const xiaoGeo = new THREE.BoxGeometry(0.85, 0.65, 0.08);
+      const xiaoMat = new THREE.MeshStandardMaterial({
+        color: 0x1a2e1d, // Seeed green PCB
+        roughness: 0.35,
+        metalness: 0.3
+      });
+      const xiaoMesh = new THREE.Mesh(xiaoGeo, xiaoMat);
+      xiaoMesh.position.set(0, -0.42, 0.18);
+      glitchGroup.add(xiaoMesh);
+
+      // XIAO RF Shield Can (silver metal)
+      const rfShieldGeo = new THREE.BoxGeometry(0.55, 0.38, 0.06);
+      const rfShieldMat = new THREE.MeshStandardMaterial({
+        color: 0xcccccc,
+        metalness: 0.9,
+        roughness: 0.2
+      });
+      const rfShield = new THREE.Mesh(rfShieldGeo, rfShieldMat);
+      rfShield.position.set(0, -0.38, 0.24);
+      glitchGroup.add(rfShield);
+
+      // 5. MPU6050 Motion Sensor IC (adjacent on carrier board)
+      const imuGeo = new THREE.BoxGeometry(0.3, 0.3, 0.06);
+      const imuMat = new THREE.MeshStandardMaterial({
+        color: 0x1e2024,
+        roughness: 0.3,
         metalness: 0.6
       });
-      const mcuMesh = new THREE.Mesh(mcuGeo, mcuMat);
-      mcuMesh.position.set(0, -0.28, 0.2);
-      glitchGroup.add(mcuMesh);
-
-      // MPU6050 Motion Sensor
-      const imuGeo = new THREE.BoxGeometry(0.34, 0.34, 0.07);
-      const imuMat = new THREE.MeshStandardMaterial({
-        color: 0x22262a,
-        roughness: 0.3,
-        metalness: 0.7
-      });
       const imuMesh = new THREE.Mesh(imuGeo, imuMat);
-      imuMesh.position.set(-0.46, -0.28, 0.2);
+      imuMesh.position.set(-0.52, -0.32, 0.18);
       glitchGroup.add(imuMesh);
 
-      // Rear Battery Cell
-      const batteryGeo = new THREE.BoxGeometry(1.42, 1.32, 0.36);
+      // 6. Rear Lithium-Polymer Battery Cell (3.7V 500mAh in dedicated compartment)
+      const batteryGeo = new THREE.BoxGeometry(1.4, 1.25, 0.32);
       const batteryMat = new THREE.MeshStandardMaterial({
-        color: 0xdde2e6,
+        color: 0xd8dde2, // Silver lithium pouch
         roughness: 0.25,
         metalness: 0.75
       });
@@ -223,45 +275,75 @@ export default function Glitch3DViewer({
       batteryMesh.position.set(0, -0.15, -0.18);
       glitchGroup.add(batteryMesh);
 
-      const kaptonGeo = new THREE.BoxGeometry(1.44, 0.38, 0.38);
+      // Yellow Kapton (polyimide) insulation tape band
+      const kaptonGeo = new THREE.BoxGeometry(1.42, 0.35, 0.34);
       const kaptonMat = new THREE.MeshStandardMaterial({
-        color: 0xfeb31d, // Rekko amber
+        color: 0xfeb31d, // Kapton amber
         roughness: 0.15,
         metalness: 0.1,
         transparent: true,
-        opacity: 0.95
+        opacity: 0.92
       });
       const kaptonMesh = new THREE.Mesh(kaptonGeo, kaptonMat);
-      kaptonMesh.position.set(0, 0.35, -0.18);
+      kaptonMesh.position.set(0, 0.32, -0.18);
       glitchGroup.add(kaptonMesh);
 
-      // Mechanical ports & controls
-      const usbcGeo = new THREE.BoxGeometry(0.56, 0.13, 0.25);
-      const usbcMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.95 });
+      // 7. Mechanical Controls & Hardware Ports
+
+      // Centered USB-C port at the bottom edge (via XIAO board)
+      const usbcGeo = new THREE.BoxGeometry(0.52, 0.14, 0.24);
+      const usbcMat = new THREE.MeshStandardMaterial({
+        color: 0xe2e8f0,
+        metalness: 0.95,
+        roughness: 0.15
+      });
       const usbcMesh = new THREE.Mesh(usbcGeo, usbcMat);
       usbcMesh.position.set(0, -1.22, 0);
       glitchGroup.add(usbcMesh);
 
-      const btnGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.2, 16);
+      // Physical ON/OFF slide switch on the right flank
+      const switchHousingGeo = new THREE.BoxGeometry(0.12, 0.32, 0.2);
+      const switchHousingMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8 });
+      const switchHousing = new THREE.Mesh(switchHousingGeo, switchHousingMat);
+      switchHousing.position.set(1.02, 0.15, 0);
+      glitchGroup.add(switchHousing);
+
+      const switchKnobGeo = new THREE.BoxGeometry(0.14, 0.12, 0.14);
+      const switchKnobMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.9 });
+      const switchKnob = new THREE.Mesh(switchKnobGeo, switchKnobMat);
+      switchKnob.position.set(1.08, 0.19, 0);
+      glitchGroup.add(switchKnob);
+
+      // Tactile button on the left flank (mood cycle)
+      const btnGeo = new THREE.CylinderGeometry(0.11, 0.11, 0.18, 16);
       btnGeo.rotateZ(Math.PI / 2);
-      const btnMat = new THREE.MeshStandardMaterial({ color: 0xed4027, metalness: 0.6 }); // Rekko red button
+      const btnMat = new THREE.MeshStandardMaterial({
+        color: 0x111215,
+        metalness: 0.7,
+        roughness: 0.25
+      });
       const btnMesh = new THREE.Mesh(btnGeo, btnMat);
-      btnMesh.position.set(-1.06, 0.1, 0);
+      btnMesh.position.set(-1.06, 0.15, 0);
       glitchGroup.add(btnMesh);
 
-      const mountLugGeo = new THREE.CylinderGeometry(0.17, 0.17, 0.24, 16);
-      const mountLugMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.9 });
+      // Top corner reinforced anchor boss and stainless steel keyring loop
+      const mountLugGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.22, 16);
+      const mountLugMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9 });
       const mountLug = new THREE.Mesh(mountLugGeo, mountLugMat);
-      mountLug.position.set(0, 1.34, 0);
+      mountLug.position.set(0, 1.32, 0);
       glitchGroup.add(mountLug);
 
-      const ringTorusGeo = new THREE.TorusGeometry(0.44, 0.08, 16, 32);
-      const ringMat = new THREE.MeshStandardMaterial({ color: 0xa4abb2, metalness: 0.95 });
+      const ringTorusGeo = new THREE.TorusGeometry(0.42, 0.07, 16, 32);
+      const ringMat = new THREE.MeshStandardMaterial({
+        color: 0xcfd6df,
+        metalness: 0.95,
+        roughness: 0.15
+      });
       const ringMesh = new THREE.Mesh(ringTorusGeo, ringMat);
-      ringMesh.position.set(0, 1.72, 0);
+      ringMesh.position.set(0, 1.7, 0);
       glitchGroup.add(ringMesh);
 
-      // Render Loop
+      // Animation Loop
       let lastTime = performance.now();
       const render = (time) => {
         const delta = Math.min((time - lastTime) / 1000, 0.1);
@@ -283,11 +365,11 @@ export default function Glitch3DViewer({
         refs.glitchGroup.rotation.x = refs.currentRotation.x;
         refs.glitchGroup.rotation.y = refs.currentRotation.y;
 
-        const scaleVal = 1 + Math.sin(time * 0.02) * refs.bounceSpring * 0.12;
+        const scaleVal = 1 + Math.sin(time * 0.02) * refs.bounceSpring * 0.08;
         refs.glitchGroup.scale.set(scaleVal, scaleVal, scaleVal);
 
         if (!refs.isDragging && !reducedMotion && forcedAngle === null) {
-          refs.glitchGroup.position.y = Math.sin(time * 0.0018) * 0.06;
+          refs.glitchGroup.position.y = Math.sin(time * 0.0015) * 0.05;
         } else {
           refs.glitchGroup.position.y = 0;
         }
@@ -316,7 +398,7 @@ export default function Glitch3DViewer({
         renderer.dispose();
       };
     } catch (err) {
-      console.warn('WebGL init error', err);
+      console.warn('WebGL initialization error', err);
       setFallbackMode(true);
     }
   }, [reducedMotion]);
@@ -400,7 +482,7 @@ export default function Glitch3DViewer({
 
   return (
     <div className={`relative flex flex-col items-center select-none ${className}`}>
-      {/* 3D Stage with Rekko card styling */}
+      {/* 3D Stage Canvas */}
       <div
         ref={containerRef}
         onPointerDown={handlePointerDown}
@@ -408,9 +490,9 @@ export default function Glitch3DViewer({
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
         onClick={handleModelClick}
-        className="relative w-full h-[360px] sm:h-[420px] md:h-[460px] cursor-grab active:cursor-grabbing flex items-center justify-center outline-none bg-[#f4e9d0]/60 rounded-2xl overflow-hidden border border-[#141414]/15"
+        className="relative w-full h-[380px] sm:h-[440px] md:h-[480px] cursor-grab active:cursor-grabbing flex items-center justify-center outline-none bg-[#f4efe4] rounded-2xl overflow-hidden border-2 border-[#111215]"
         role="region"
-        aria-label="Interactive 3D model of GLITCH. Drag to rotate, tap to cycle expressions."
+        aria-label="Interactive 3D model of GLITCH. Drag to rotate 360 degrees, click or tap to cycle OLED eye expressions."
         tabIndex={0}
       >
         {fallbackMode ? (
@@ -418,28 +500,35 @@ export default function Glitch3DViewer({
             <img
               src="/images/glitch-resin-hero.jpg"
               alt="GLITCH cast in optical clear resin case"
-              className="max-h-[80%] object-contain rounded-xl shadow-lg"
+              className="max-h-[85%] object-contain rounded-xl shadow-md"
             />
+            <p className="font-mono text-xs text-[#525866] mt-2">
+              WebGL fallback view: 50 × 40 × 20 mm enclosure render
+            </p>
           </div>
         ) : (
           <canvas ref={canvasRef} className="w-full h-full block" />
         )}
 
-        {/* Floating pill badge */}
-        <div className="absolute top-4 left-4 bg-[#141414] text-[#fef5e1] px-3 py-1 rounded-full font-mono text-[11px] font-semibold tracking-wider pointer-events-none flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#00f5ff] animate-ping" />
-          <span>DRAG 360° // TAP SCREEN FOR MOODS</span>
+        {/* Technical HUD Floating Overlays */}
+        <div className="absolute top-4 left-4 bg-[#111215] text-[#fbf8f2] px-3.5 py-1.5 rounded-full font-mono text-[11px] font-bold tracking-wider pointer-events-none flex items-center gap-2 border border-[#111215] shadow-editorial-sm">
+          <span className="w-2 h-2 rounded-full bg-[#00f5ff] animate-pulse" />
+          <span>DRAG TO ROTATE // TAP SCREEN TO TEST EXPRESSIONS</span>
         </div>
 
-        <div className="absolute bottom-4 left-4 bg-white/80 backdrop-blur-xs text-[#141414] px-3 py-1 rounded-full font-mono text-[10px] font-bold uppercase border border-[#141414]/10">
-          SCALE 1:1 // 50 × 40 × 20 MM (TARGET)
+        <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-xs text-[#111215] px-3 py-1 rounded-full font-mono text-[10px] font-bold uppercase border border-[#111215] shadow-editorial-sm">
+          SCALE: 1:1 TARGET // 50 × 40 × 20 MM
+        </div>
+
+        <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-xs text-[#525866] px-3 py-1 rounded-full font-mono text-[10px] font-bold uppercase border border-[#111215]">
+          INTERACTIVE 3D DEMO
         </div>
       </div>
 
-      {/* View Presets Bar (Pill style) */}
-      <div className="w-full bg-[#f4e9d0] p-2 rounded-xl flex flex-wrap items-center justify-between gap-2 border border-[#141414]/10 mt-3">
+      {/* Camera View Controls Bar */}
+      <div className="w-full bg-[#ffffff] p-2 rounded-2xl flex flex-wrap items-center justify-between gap-2 border-2 border-[#111215] shadow-editorial-sm mt-3">
         <div className="flex items-center gap-1.5 font-mono text-xs font-bold">
-          <span className="text-[#141414]/60 text-[11px] px-2 hidden sm:inline">VIEW:</span>
+          <span className="text-[#8b92a0] text-[11px] px-2 hidden sm:inline uppercase">VIEW:</span>
           {[
             { id: 'front', label: 'FRONT' },
             { id: 'back', label: 'REAR' },
@@ -453,8 +542,8 @@ export default function Glitch3DViewer({
               onClick={() => setCameraView(v.id)}
               className={`px-3 py-1 rounded-full text-[11px] font-bold uppercase transition-all ${
                 currentView === v.id
-                  ? 'bg-[#141414] text-[#fef5e1]'
-                  : 'bg-white/70 hover:bg-white text-[#141414]'
+                  ? 'bg-[#111215] text-[#fbf8f2]'
+                  : 'bg-[#f4efe4] hover:bg-[#e8e2d4] text-[#111215]'
               }`}
             >
               {v.label}
@@ -465,13 +554,13 @@ export default function Glitch3DViewer({
         <button
           type="button"
           onClick={() => setCameraView('front')}
-          className="font-mono text-[10px] font-bold px-3 py-1 bg-[#ed4027] text-white rounded-full hover:bg-[#c9321c] transition-colors"
+          className="font-mono text-[11px] font-bold px-3 py-1 bg-[#f4efe4] hover:bg-[#111215] hover:text-white text-[#111215] rounded-full transition-colors border border-[#111215]"
         >
-          RESET ↺
+          RESET VIEW ↺
         </button>
       </div>
 
-      {/* Hotspots Carousel */}
+      {/* Component Hotspots Bar */}
       <div className="w-full mt-3 overflow-x-auto pb-1 flex gap-2 no-scrollbar">
         {HARDWARE_HOTSPOTS.map((spot) => {
           const isSelected = activeHotspotId === spot.id;
@@ -480,13 +569,13 @@ export default function Glitch3DViewer({
               key={spot.id}
               type="button"
               onClick={() => handleHotspotClick(spot)}
-              className={`flex-shrink-0 font-mono text-[11px] font-bold px-3 py-1.5 rounded-full border transition-all flex items-center gap-1.5 uppercase ${
+              className={`flex-shrink-0 font-mono text-[11px] font-bold px-3.5 py-1.5 rounded-full border-2 transition-all flex items-center gap-2 uppercase ${
                 isSelected
-                  ? 'bg-[#154586] text-[#fef5e1] border-[#154586]'
-                  : 'bg-white text-[#141414] border-[#141414]/15 hover:border-[#141414]'
+                  ? 'bg-[#111215] text-[#fbf8f2] border-[#111215] shadow-editorial-sm'
+                  : 'bg-white text-[#111215] border-[#111215] hover:bg-[#f4efe4]'
               }`}
             >
-              <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-[#feb31d]' : 'bg-[#00f5ff]'}`} />
+              <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-[#00f5ff]' : 'bg-[#111215]'}`} />
               <span>{spot.title.split(' ')[0]}</span>
             </button>
           );
